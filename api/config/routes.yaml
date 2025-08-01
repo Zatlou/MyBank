@@ -1,0 +1,14 @@
+# api/config/routes.yaml
+
+# Déclare explicitement ta route ping
+api_ping:
+    path: /api/ping
+    controller: App\Controller\PingController::ping
+    methods: [GET]
+# (Tu pourras rajouter ici d’autres routes ou des imports avec la bonne syntaxe plus tard.)
+# ... tes autres routes au-dessus
+
+# Importe toutes les routes d'API Platform
+api_platform:
+    resource: "../config/routes/api_platform.yaml"
+    prefix: /

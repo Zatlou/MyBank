@@ -1,0 +1,4 @@
+api_ping:
+  path: /api/ping
+  controller: App\Controller\PingController::ping
+  methods: [GET]

@@ -1,0 +1,4 @@
+# config/routes/jwt_login.yaml
+api_login:
+    path: /api/login
+    methods: [POST]

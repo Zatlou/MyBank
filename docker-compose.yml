@@ -1,0 +1,56 @@
+# docker-compose.yml
+services:
+  front:
+    build: ./front
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+    networks:
+      - mybank
+
+  api:
+    build: ./api
+    image: mybank-api:pgsql-enabled
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    volumes:
+      - ./api:/app # bind-mount pour du live-coding
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    networks:
+      - mybank
+    command: [
+        "php",
+        "-d",
+        "display_errors=0",
+        "-d",
+        "display_startup_errors=0",
+        "-d",
+        "error_reporting=8191", # E_ALL sans E_DEPRECATED ni E_USER_DEPRECATED
+        "-S",
+        "0.0.0.0:8000",
+        "-t",
+        "public",
+        "public/index.php",
+      ]
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: mybank
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    networks:
+      - mybank
+
+networks:
+  mybank:
+
+volumes:
+  db-data:

@@ -1,0 +1,5 @@
+framework:
+    cache:
+        pools:
+            api_platform.cache.metadata:
+                public: false

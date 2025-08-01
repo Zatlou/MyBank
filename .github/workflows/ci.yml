@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+
+    steps:
+      # 1) Récupère le code
+      - uses: actions/checkout@v4
+
+      # 2) Build API (Symfony)
+      - name: Build API image
+        run: docker build -t mybank-api ./api
+
+      # 3) Lance les tests PHPUnit à l’intérieur
+      - name: Run PHPUnit
+        run: |
+          docker run --rm mybank-api php bin/phpunit --testdox

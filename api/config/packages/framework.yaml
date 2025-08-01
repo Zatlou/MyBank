@@ -1,0 +1,17 @@
+# config/packages/framework.yaml
+framework:
+    # 1. La clé secrète de l’application (nécessaire au router, à l’encoder, etc.)
+    secret: "%env(APP_SECRET)%"
+
+    # 2. Règle l’override HTTP (dépréciation Symfony 6.1)
+    http_method_override: false
+
+    # 3. Désactive la session (API stateless)
+    session:
+        enabled: false
+
+when@test:
+    framework:
+        test: true
+        session:
+            storage_factory_id: session.storage.factory.mock_file
