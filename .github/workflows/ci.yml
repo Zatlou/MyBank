@@ -2,7 +2,7 @@ name: CI & CD
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build-and-publish:
@@ -21,11 +21,13 @@ jobs:
       - name: Validate composer.json
         run: composer validate --strict
 
-      - name: Install Composer dependencies
+      - name: Install API dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
+        working-directory: api
 
       - name: Run PHPUnit
         run: vendor/bin/phpunit --testdox
+        working-directory: api
 
       - name: Login to Docker Hub
         uses: docker/login-action@v2
@@ -36,16 +38,16 @@ jobs:
       - name: Build & push API image
         uses: docker/build-push-action@v4
         with:
-          context: ./api
-          file: ./api/Dockerfile
+          context: api
+          file: api/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
 
       - name: Build & push Front image
         uses: docker/build-push-action@v4
         with:
-          context: ./front
-          file: ./front/Dockerfile
+          context: front
+          file: front/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
@@ -55,7 +57,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code (pour le SSH keyscan)
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup SSH agent
@@ -63,21 +65,18 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Ensure known_hosts
-        run: |
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+      - name: Add VM to known_hosts
+        run: ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy & migrate
         run: |
-          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+          ssh ${VM_USER}@${VM_HOST} << 'EOF'
             cd ~/mybank
-            # recharge .env
             export $(grep -v '^#' .env | xargs)
-            # pull dernières images
             docker-compose pull
-            # (re)lance les conteneurs
             docker-compose up -d
-            # exécute les migrations
-            docker-compose exec api \
-              php bin/console doctrine:migrations:migrate --no-interaction
+            docker-compose exec api php bin/console doctrine:migrations:migrate --no-interaction
           EOF
+        env:
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
