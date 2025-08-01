@@ -2,29 +2,32 @@ name: CI & CD
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
 
 jobs:
-  build-test:
+  build-and-publish:
+    name: 🚧 Build, Test & Publish
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP
+      - name: Setup PHP 8.2
         uses: shivammathur/setup-php@v2
         with:
-          php-version: 8.1
+          php-version: 8.2
+
+      - name: Validate composer.json
+        run: composer validate --strict
 
       - name: Install Composer dependencies
-        working-directory: api
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run PHPUnit
-        working-directory: api
-        run: php bin/phpunit --testdox
+        run: vendor/bin/phpunit --testdox
 
-      - name: Log in to Docker Hub
+      - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -33,32 +36,48 @@ jobs:
       - name: Build & push API image
         uses: docker/build-push-action@v4
         with:
-          context: api
-          file: api/Dockerfile
+          context: ./api
+          file: ./api/Dockerfile
           push: true
-          tags: zatlou/mybank-api:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
 
       - name: Build & push Front image
         uses: docker/build-push-action@v4
         with:
-          context: front
-          file: front/Dockerfile
+          context: ./front
+          file: ./front/Dockerfile
           push: true
-          tags: zatlou/mybank-front:latest
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
   deploy-to-vm:
-    needs: build-test
+    name: 🚀 Deploy to VM
+    needs: build-and-publish
     runs-on: ubuntu-latest
+
     steps:
-      - name: Deploy to VM via SSH
-        uses: appleboy/ssh-action@v0.1.7
+      - name: Checkout code (pour le SSH keyscan)
+        uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.5.4
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Ensure known_hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy & migrate
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
             cd ~/mybank
-            docker pull zatlou/mybank-api:latest
-            docker pull zatlou/mybank-front:latest
-            docker-compose down
-            docker-compose up -d --build
+            # recharge .env
+            export $(grep -v '^#' .env | xargs)
+            # pull dernières images
+            docker-compose pull
+            # (re)lance les conteneurs
+            docker-compose up -d
+            # exécute les migrations
+            docker-compose exec api \
+              php bin/console doctrine:migrations:migrate --no-interaction
+          EOF
