@@ -1,3 +1,4 @@
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -11,14 +12,31 @@ jobs:
     timeout-minutes: 15
 
     steps:
-      # 1) Récupère le code
+      # 1) Récupérer le code
       - uses: actions/checkout@v4
 
-      # 2) Build API (Symfony)
+      # 2) Installer PHP 8.3 + Composer
+      - name: Setup PHP & Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: intl, pdo_pgsql
+          coverage: none
+
+      # 3) Installer les dépendances back (y compris require-dev)
+      - name: Install back dependencies
+        working-directory: api
+        run: composer install --prefer-dist --no-interaction
+
+      # 4) Lancer les tests PHPUnit
+      - name: Run PHPUnit
+        working-directory: api
+        run: ./bin/phpunit --testdox
+
+      # 5) Build de l’image API (prod-ready)
       - name: Build API image
         run: docker build -t mybank-api ./api
 
-      # 3) Lance les tests PHPUnit à l’intérieur
-      - name: Run PHPUnit
-        run: |
-          docker run --rm mybank-api php bin/phpunit --testdox
+      # 6) Build de l’image Front (prod-ready)
+      - name: Build Front image
+        run: docker build -t mybank-front ./front
