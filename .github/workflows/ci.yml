@@ -31,7 +31,7 @@ jobs:
       # 4) Lancer les tests PHPUnit
       - name: Run PHPUnit
         working-directory: api
-        run: ./bin/phpunit --testdox
+        run: php ./vendor/bin/phpunit --testdox
 
       # 5) Build de l’image API (prod-ready)
       - name: Build API image
