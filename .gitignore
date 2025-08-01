@@ -1,0 +1,28 @@
+# Environnements
+.env
+.env.local
+.env.*.local
+
+# Dossiers de dépendances
+/api/vendor/
+/front/node_modules/
+
+# Logs, caches, builds
+/api/var/
+/front/build/
+/front/dist/
+/api/public/bundles/
+/api/public/build/
+
+# IDE
+/.idea/
+/.vscode/
+
+# Systèmes
+.DS_Store
+Thumbs.db
+
+# Autres
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
