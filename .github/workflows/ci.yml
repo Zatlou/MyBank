@@ -8,18 +8,16 @@ on:
 jobs:
   build-and-publish:
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
 
     steps:
       - uses: actions/checkout@v4
 
-      # PHP & Composer pour les tests
+      # 1) Tests back
       - name: Setup PHP & Composer
         uses: shivammathur/setup-php@v2
         with:
           php-version: 8.3
           extensions: intl, pdo_pgsql
-          coverage: none
 
       - name: Install back dependencies
         working-directory: api
@@ -29,7 +27,7 @@ jobs:
         working-directory: api
         run: php ./vendor/bin/phpunit --testdox
 
-      # Connexion à Docker Hub
+      # 2) Login Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
@@ -37,7 +35,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Build et push API
+      # 3) Build & Push API
       - name: Build & Push API image
         uses: docker/build-push-action@v4
         with:
@@ -45,7 +43,13 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
 
-      # Build et push Front
+      # 4) Build & Push Front
+      - name: Install front deps & Build
+        working-directory: front
+        run: |
+          npm ci
+          npm run build
+
       - name: Build & Push Front image
         uses: docker/build-push-action@v4
         with:
