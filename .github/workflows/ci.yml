@@ -2,8 +2,7 @@ name: CI & CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build-test:
@@ -18,9 +17,11 @@ jobs:
           php-version: 8.1
 
       - name: Install Composer dependencies
-        run: composer install --no-progress --no-suggest --prefer-dist
+        working-directory: api
+        run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run PHPUnit
+        working-directory: api
         run: php bin/phpunit --testdox
 
       - name: Log in to Docker Hub
@@ -32,16 +33,16 @@ jobs:
       - name: Build & push API image
         uses: docker/build-push-action@v4
         with:
-          context: ./api
-          file: ./api/Dockerfile
+          context: api
+          file: api/Dockerfile
           push: true
           tags: zatlou/mybank-api:latest
 
       - name: Build & push Front image
         uses: docker/build-push-action@v4
         with:
-          context: ./front
-          file: ./front/Dockerfile
+          context: front
+          file: front/Dockerfile
           push: true
           tags: zatlou/mybank-front:latest
 
@@ -55,7 +56,6 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # si votre clé n'a pas de passphrase, pas besoin de passphrase
           script: |
             cd ~/mybank
             docker pull zatlou/mybank-api:latest
