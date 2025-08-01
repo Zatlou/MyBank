@@ -1,58 +1,36 @@
-name: CI
+name: CI & CD
 
 on:
   push:
     branches: [main]
-  pull_request:
 
 jobs:
-  build-and-publish:
-    runs-on: ubuntu-22.04
+  build-test:
+    # votre job existant : tests + build & push image
+
+  deploy-to-vm:
+    needs: build-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # 1) Tests back
-      - name: Setup PHP & Composer
-        uses: shivammathur/setup-php@v2
+      - name: Setup SSH key
+        uses: webfactory/ssh-agent@v0.8.1
         with:
-          php-version: 8.3
-          extensions: intl, pdo_pgsql
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Install back dependencies
-        working-directory: api
-        run: composer install --prefer-dist --no-interaction
-
-      - name: Run PHPUnit
-        working-directory: api
-        run: php ./vendor/bin/phpunit --testdox
-
-      # 2) Login Docker Hub
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      # 3) Build & Push API
-      - name: Build & Push API image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./api
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
-
-      # 4) Build & Push Front
-      - name: Install front deps & Build
-        working-directory: front
+      - name: Ensure known_hosts
         run: |
-          npm ci
-          npm run build
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Build & Push Front image
-        uses: docker/build-push-action@v4
-        with:
-          context: ./front
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
+      - name: Pull & restart services on VM
+        run: |
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd ~/mybank
+            export JWT_SECRET=${{ secrets.JWT_SECRET }}
+            docker-compose pull
+            docker-compose up -d
+          EOF
