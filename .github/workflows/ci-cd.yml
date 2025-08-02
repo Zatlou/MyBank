@@ -61,7 +61,6 @@ jobs:
     needs: build-and-publish
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code (for known_hosts)
         uses: actions/checkout@v4
@@ -69,7 +68,7 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_DEPLOY_KEY }}
 
       - name: Add VM to known_hosts
         run: |
