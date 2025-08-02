@@ -78,8 +78,8 @@ jobs:
 
       - name: Add VM to known_hosts
         run: |
-          mkdir -p /github/home/.ssh
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> /github/home/.ssh/known_hosts
+          mkdir -p ~/.ssh
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Deploy to VM
         env:
