@@ -14,7 +14,44 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # ... (étapes build/test/images comme avant)
+      - name: Setup PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.2
+
+      - name: Validate composer.json
+        working-directory: api
+        run: composer validate --no-check-publish
+
+      - name: Install API dependencies
+        working-directory: api
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      - name: Run PHPUnit
+        working-directory: api
+        run: vendor/bin/phpunit --testdox
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build & push API image
+        uses: docker/build-push-action@v4
+        with:
+          context: api
+          file: api/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
+
+      - name: Build & push Front image
+        uses: docker/build-push-action@v4
+        with:
+          context: front
+          file: front/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
   deploy:
     name: 🚀 Deploy to VM
@@ -31,10 +68,18 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      # Debug HOME variable (optionnel, tu peux enlever quand ça marche)
+      - name: Debug HOME variable
+        run: |
+          echo "HOME=$HOME"
+          echo "USER=$USER"
+          pwd
+          ls -la /
+
       - name: Add VM to known_hosts
         run: |
-          mkdir -p "$HOME/.ssh"
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> "$HOME/.ssh/known_hosts"
+          mkdir -p /github/home/.ssh
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> /github/home/.ssh/known_hosts
 
       - name: Deploy to VM
         env:
