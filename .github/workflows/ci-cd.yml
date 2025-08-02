@@ -69,30 +69,40 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          # Utilisez ici **une clé de déploiement** sans 2FA !
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_DEPLOY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
+      - name: Install dependencies for OTP
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect oathtool
+
       - name: Deploy to VM
         env:
-          VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER_DEPLOY }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          SSH_OTP_SECRET: ${{ secrets.SSH_OTP_SECRET }}
+          VM_HOST:        ${{ secrets.VM_HOST }}
+          VM_USER:        ${{ secrets.VM_USER }}
+          JWT_SECRET:     ${{ secrets.JWT_SECRET }}
         run: |
-          ssh -o BatchMode=yes \
-              -o StrictHostKeyChecking=no \
-              $VM_USER@$VM_HOST << 'EOF'
-            set -eux
+          # 1) Génération du code TOTP
+          OTP=$(oathtool --totp -b "$SSH_OTP_SECRET")
 
-            cd ~/mybank
-            export JWT_SECRET="$JWT_SECRET"
-
-            docker-compose pull
-            docker-compose up -d
-            docker-compose exec -T api \
-              php bin/console doctrine:migrations:migrate --no-interaction
-          EOF
+          # 2) Déploiement via expect -c (plus de here-doc)
+          expect -c "spawn ssh -o BatchMode=yes -o StrictHostKeyChecking=no $VM_USER@$VM_HOST;
+expect {
+  -re {.*[Vv]erification.*code.*:.*} { send \"$OTP\r\"; exp_continue }
+  -re {.*\\$ $} {
+    send \"set -eux; \
+cd ~/mybank; \
+export JWT_SECRET='$JWT_SECRET'; \
+docker-compose pull; \
+docker-compose up -d; \
+docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction\r\"; \
+    send \"exit\r\" 
+  }
+};
+expect eof"
