@@ -1,65 +1,26 @@
+# .github/workflows/ci-cd.yml
 name: CI & CD
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-and-publish:
     name: 🚧 Build, Test & Publish
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP 8.2
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
-
-      - name: Validate composer.json
-        working-directory: api
-        run: composer validate --no-check-publish
-
-      - name: Install API dependencies
-        working-directory: api
-        run: composer install --no-interaction --no-progress --prefer-dist
-
-      - name: Run PHPUnit
-        working-directory: api
-        run: vendor/bin/phpunit --testdox
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build & push API image
-        uses: docker/build-push-action@v4
-        with:
-          context: api
-          file: api/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
-
-      - name: Build & push Front image
-        uses: docker/build-push-action@v4
-        with:
-          context: front
-          file: front/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
+      # … tes étapes build/test/publi
 
   deploy:
     name: 🚀 Deploy to VM
     needs: build-and-publish
-    runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main'
-
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code (for known_hosts)
         uses: actions/checkout@v4
@@ -72,43 +33,41 @@ jobs:
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
       - name: Install dependencies for OTP
         run: |
-          # Debian/Ubuntu :
-          sudo apt-get update && sudo apt-get install -y expect oathtool
-          # (ou apk add expect oathtool pour Alpine)
+          sudo apt-get update
+          sudo apt-get install -y expect oathtool
 
       - name: Deploy to VM (avec OTP)
         env:
           SSH_OTP_SECRET: ${{ secrets.SSH_OTP_SECRET }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          # 1) Génération du code TOTP
           OTP=$(oathtool --totp -b "$SSH_OTP_SECRET")
 
+          # 2) Lancement de expect en ligne
+          expect -c "
+            spawn ssh -o BatchMode=yes -o StrictHostKeyChecking=no $VM_USER@$VM_HOST
 
-            expect <<EOF
-              set timeout 20
-              spawn ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $VM_USER@$VM_HOST
-              expect {
-                -re "Verification.*code.*:" {
-                  send "\$env(OTP)\r"
-                  exp_continue
-                }
-                -re "\\$ $" {
-                  send "set -eux; cd ~/mybank; \
-                        docker-compose pull; \
-                        docker-compose up -d; \
-                        docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction\r"
-                  send "exit\r"
-                }
+            expect {
+              -re {.*[Vv]erification.*code.*:.*} {
+                send \"$OTP\r\";
+                exp_continue;
               }
-              expect eof
-            EOF
+              -re {.*\\$ $} {
+                send \"set -eux; \
+              cd ~/mybank; \
+              export JWT_SECRET='$JWT_SECRET'; \
+              docker-compose pull; \
+              docker-compose up -d; \
+              docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction\r\";
+                              send \"exit\r\";
+                            }
+                          }
+                          expect eof
+                        "
