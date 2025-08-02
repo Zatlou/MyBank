@@ -54,24 +54,61 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
-          - name: Deploy to VM
-          run: |
-            ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
-              set -eux
-              START=$SECONDS
-        
-              cd ~/mybank
-              export JWT_SECRET="$JWT_SECRET"
-              docker-compose pull
-              docker-compose up -d
-              docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction
-        
-              DURATION=$(( SECONDS - START ))
-              echo ">> Déploiement + migrations en ${DURATION}s"
+  deploy:
+    name: 🚀 Deploy to VM
+    needs: build-and-publish
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code (for known_hosts)
+        uses: actions/checkout@v4
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add VM to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Install dependencies for OTP
+        run: |
+          # Debian/Ubuntu :
+          sudo apt-get update && sudo apt-get install -y expect oathtool
+          # (ou apk add expect oathtool pour Alpine)
+
+      - name: Deploy to VM (avec OTP)
+        env:
+          SSH_OTP_SECRET: ${{ secrets.SSH_OTP_SECRET }}
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          VM_HOST: ${{ secrets.VM_HOST }}
+          VM_USER: ${{ secrets.VM_USER }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          OTP=$(oathtool --totp -b "$SSH_OTP_SECRET")
+
+
+            expect <<EOF
+              set timeout 20
+              spawn ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa $VM_USER@$VM_HOST
+              expect {
+                -re "Verification.*code.*:" {
+                  send "\$env(OTP)\r"
+                  exp_continue
+                }
+                -re "\\$ $" {
+                  send "set -eux; cd ~/mybank; \
+                        docker-compose pull; \
+                        docker-compose up -d; \
+                        docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction\r"
+                  send "exit\r"
+                }
+              }
+              expect eof
             EOF
-          shell: bash
-          env:
-            JWT_SECRET: ${{ secrets.JWT_SECRET }}
-            VM_HOST:   ${{ secrets.VM_HOST }}
-            VM_USER:   ${{ secrets.VM_USER }}
-        
