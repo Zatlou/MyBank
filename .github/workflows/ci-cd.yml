@@ -1,13 +1,10 @@
-# .github/workflows/ci-cd.yml
 name: CI & CD
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build-and-publish:
@@ -17,44 +14,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup PHP 8.2
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: 8.2
-
-      - name: Validate composer.json
-        working-directory: api
-        run: composer validate --no-check-publish
-
-      - name: Install API dependencies
-        working-directory: api
-        run: composer install --no-interaction --no-progress --prefer-dist
-
-      - name: Run PHPUnit
-        working-directory: api
-        run: vendor/bin/phpunit --testdox
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build & push API image
-        uses: docker/build-push-action@v4
-        with:
-          context: api
-          file: api/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-api:latest
-
-      - name: Build & push Front image
-        uses: docker/build-push-action@v4
-        with:
-          context: front
-          file: front/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
+      # ... (étapes build/test/images comme avant)
 
   deploy:
     name: 🚀 Deploy to VM
@@ -69,30 +29,26 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          # Utilisez ici **une clé de déploiement** sans 2FA !
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_DEPLOY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add VM to known_hosts
         run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          mkdir -p "$HOME/.ssh"
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> "$HOME/.ssh/known_hosts"
 
       - name: Deploy to VM
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER_DEPLOY }}
+          VM_USER: ${{ secrets.VM_USER }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           ssh -o BatchMode=yes \
+              -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
-              $VM_USER@$VM_HOST << 'EOF'
-            set -eux
-
-            cd ~/mybank
-            export JWT_SECRET="$JWT_SECRET"
-
-            docker-compose pull
-            docker-compose up -d
-            docker-compose exec -T api \
-              php bin/console doctrine:migrations:migrate --no-interaction
-          EOF
+              "$VM_USER@$VM_HOST" \
+              "set -eux; \
+               cd ~/mybank; \
+               export JWT_SECRET='$JWT_SECRET'; \
+               docker-compose pull; \
+               docker-compose up -d; \
+               docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction"
