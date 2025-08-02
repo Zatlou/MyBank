@@ -69,6 +69,14 @@ jobs:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       # Debug HOME variable (optionnel, tu peux enlever quand ça marche)
+      - name: Debug environment variables
+        run: |
+          echo "HOME = $HOME"
+          echo "USER = $USER"
+          echo "whoami: $(whoami)"
+          pwd
+          env
+          ls -la ~/
       - name: Debug HOME variable
         run: |
           echo "HOME=$HOME"
