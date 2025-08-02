@@ -84,6 +84,11 @@ jobs:
           pwd
           ls -la /
 
+          - name: Setup SSH agent
+          uses: webfactory/ssh-agent@v0.8.0
+          with:
+            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
