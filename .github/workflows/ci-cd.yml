@@ -76,6 +76,11 @@ jobs:
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Check ~/.ssh existence and permissions
+        run: |
+          ls -la ~/
+          ls -la ~/.ssh || echo "Pas de .ssh"
+          touch ~/.ssh/test_ci_write || echo "Impossible d'écrire dans .ssh"
 
       - name: Add VM to known_hosts
         run: |
