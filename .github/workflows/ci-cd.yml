@@ -1,3 +1,4 @@
+# .github/workflows/ci-cd.yml
 name: CI & CD
 
 on:
@@ -53,41 +54,57 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
-  deploy:
+  deploy-front:
+    name: 🚀 Deploy Front React to AlwaysData
+    needs: build-and-publish
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install & Build React
+        working-directory: ./front
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy via SFTP to AlwaysData
+        uses: appleboy/sftp-action@master
+        with:
+          host: ${{ secrets.ALWAYSDATA_HOST }}
+          port: 22
+          username: ${{ secrets.ALWAYSDATA_USER }}
+          password: ${{ secrets.ALWAYSDATA_PASSWORD }}
+          source: "./front/build/**"
+          target: ${{ secrets.ALWAYSDATA_TARGET_DIR }}
+          strip_components: 1
+
+  deploy-vm:
     name: 🚀 Deploy to VM
     needs: build-and-publish
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code (for known_hosts)
         uses: actions/checkout@v4
-
-      # Debug du dossier HOME et .ssh pour diagnostiquer si besoin
-      - name: Debug HOME and SSH
-        run: |
-          echo "HOME=$HOME"
-          whoami
-          pwd
-          ls -la ~/
-          ls -la ~/.ssh || echo "Pas de .ssh"
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - name: Check ~/.ssh existence and permissions
-        run: |
-          ls -la ~/
-          ls -la ~/.ssh || echo "Pas de .ssh"
-          touch ~/.ssh/test_ci_write || echo "Impossible d'écrire dans .ssh"
 
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts || true
+          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
 
-      - name: Deploy to VM
+      - name: Deploy to VM via SSH
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
           VM_USER: ${{ secrets.VM_USER }}
@@ -102,4 +119,5 @@ jobs:
                export JWT_SECRET='$JWT_SECRET'; \
                docker-compose pull; \
                docker-compose up -d; \
-               docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction"
+               docker-compose exec -T api \
+                 php bin/console doctrine:migrations:migrate --no-interaction"
