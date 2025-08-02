@@ -61,6 +61,7 @@ jobs:
     needs: build-and-publish
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code (for known_hosts)
         uses: actions/checkout@v4
@@ -68,7 +69,8 @@ jobs:
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.SSH_DEPLOY_KEY }}
+          # Utilisez ici **une clé de déploiement** sans 2FA !
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY_DEPLOY }}
 
       - name: Add VM to known_hosts
         run: |
@@ -78,16 +80,19 @@ jobs:
       - name: Deploy to VM
         env:
           VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER }}
+          VM_USER: ${{ secrets.VM_USER_DEPLOY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           ssh -o BatchMode=yes \
-              -o ConnectTimeout=10 \
               -o StrictHostKeyChecking=no \
-              "$VM_USER@$VM_HOST" \
-              "set -eux; \
-               cd ~/mybank; \
-               export JWT_SECRET='$JWT_SECRET'; \
-               docker-compose pull; \
-               docker-compose up -d; \
-               docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction"
+              $VM_USER@$VM_HOST << 'EOF'
+            set -eux
+
+            cd ~/mybank
+            export JWT_SECRET="$JWT_SECRET"
+
+            docker-compose pull
+            docker-compose up -d
+            docker-compose exec -T api \
+              php bin/console doctrine:migrations:migrate --no-interaction
+          EOF
