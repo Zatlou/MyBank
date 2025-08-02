@@ -88,11 +88,10 @@ jobs:
   deploy-vm:
     name: 🚀 Deploy to VM
     needs: build-and-publish
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     steps:
-      - name: Checkout code (for known_hosts)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
@@ -102,7 +101,7 @@ jobs:
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan -H "${{ secrets.VM_HOST }}" >> ~/.ssh/known_hosts
+          echo "${{ secrets.VM_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
       - name: Deploy to VM via SSH
         env:
@@ -112,12 +111,11 @@ jobs:
         run: |
           ssh -o BatchMode=yes \
               -o ConnectTimeout=10 \
-              -o StrictHostKeyChecking=no \
+              -o StrictHostKeyChecking=yes \
               "$VM_USER@$VM_HOST" \
               "set -eux; \
                cd ~/mybank; \
                export JWT_SECRET='$JWT_SECRET'; \
                docker-compose pull; \
                docker-compose up -d; \
-               docker-compose exec -T api \
-                 php bin/console doctrine:migrations:migrate --no-interaction"
+               docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction"
