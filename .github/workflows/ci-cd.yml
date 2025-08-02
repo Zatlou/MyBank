@@ -63,31 +63,19 @@ jobs:
       - name: Checkout code (for known_hosts)
         uses: actions/checkout@v4
 
+      # Debug du dossier HOME et .ssh pour diagnostiquer si besoin
+      - name: Debug HOME and SSH
+        run: |
+          echo "HOME=$HOME"
+          whoami
+          pwd
+          ls -la ~/
+          ls -la ~/.ssh || echo "Pas de .ssh"
+
       - name: Setup SSH agent
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      # Debug HOME variable (optionnel, tu peux enlever quand ça marche)
-      - name: Debug environment variables
-        run: |
-          echo "HOME = $HOME"
-          echo "USER = $USER"
-          echo "whoami: $(whoami)"
-          pwd
-          env
-          ls -la ~/
-      - name: Debug HOME variable
-        run: |
-          echo "HOME=$HOME"
-          echo "USER=$USER"
-          pwd
-          ls -la /
-
-          - name: Setup SSH agent
-          uses: webfactory/ssh-agent@v0.8.0
-          with:
-            ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Add VM to known_hosts
         run: |
