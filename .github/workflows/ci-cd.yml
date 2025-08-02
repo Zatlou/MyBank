@@ -54,38 +54,24 @@ jobs:
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
 
-  deploy:
-    name: 🚀 Deploy to VM
-    needs: build-and-publish
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout code (for known_hosts)
-        uses: actions/checkout@v4
-
-      - name: Setup SSH agent
-        uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-
-      - name: Add VM to known_hosts
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Deploy & migrate on VM
-        env:
-          VM_HOST: ${{ secrets.VM_HOST }}
-          VM_USER: ${{ secrets.VM_USER }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        run: |
-          ssh $VM_USER@$VM_HOST << 'EOF'
-            cd ~/mybank
-            export JWT_SECRET=$JWT_SECRET
-            docker-compose pull
-            docker-compose up -d
-            # Lance les migrations automatiquement
-            docker-compose exec api \
-              php bin/console doctrine:migrations:migrate --no-interaction
-          EOF
+          - name: Deploy to VM
+          run: |
+            ssh -o StrictHostKeyChecking=no $VM_USER@$VM_HOST << 'EOF'
+              set -eux
+              START=$SECONDS
+        
+              cd ~/mybank
+              export JWT_SECRET="$JWT_SECRET"
+              docker-compose pull
+              docker-compose up -d
+              docker-compose exec -T api php bin/console doctrine:migrations:migrate --no-interaction
+        
+              DURATION=$(( SECONDS - START ))
+              echo ">> Déploiement + migrations en ${DURATION}s"
+            EOF
+          shell: bash
+          env:
+            JWT_SECRET: ${{ secrets.JWT_SECRET }}
+            VM_HOST:   ${{ secrets.VM_HOST }}
+            VM_USER:   ${{ secrets.VM_USER }}
+        
