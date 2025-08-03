@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL, // doit être http://89.168.54.172:8000/api
+  baseURL: process.env.REACT_APP_API_URL,
 });
 
 const token = localStorage.getItem("auth_token");

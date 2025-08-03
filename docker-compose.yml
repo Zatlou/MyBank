@@ -1,4 +1,3 @@
-# docker-compose.yml
 services:
   front:
     build:
@@ -18,21 +17,22 @@ services:
       - 8.8.8.8
       - 1.1.1.1
     volumes:
-      - ./api:/app # bind-mount pour du live-coding
+      - ./api:/app
     depends_on:
       - db
     ports:
       - "8000:8000"
     networks:
       - mybank
-    command: [
+    command:
+      [
         "php",
         "-d",
         "display_errors=0",
         "-d",
         "display_startup_errors=0",
         "-d",
-        "error_reporting=8191", # E_ALL sans E_DEPRECATED ni E_USER_DEPRECATED
+        "error_reporting=8191",
         "-S",
         "0.0.0.0:8000",
         "-t",

@@ -1,14 +1,17 @@
-/** @type {import('tailwindcss').Config} */
+// tailwind.config.js
 module.exports = {
+  content: ["./src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        primary: "#59e5a9",
-        black: "#000000",
-        darkblue: "#14213d",
-        orange: "#fca311",
-        red: "#ec0b43",
+        primary: "#59E5A9",
+        dark: "#14213D",
+        accent: "#FCA311",
+      },
+      fontFamily: {
+        sans: ["Montserrat", "ui-sans-serif", "system-ui"],
       },
     },
   },
+  plugins: [],
 };

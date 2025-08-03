@@ -21,7 +21,7 @@ class ExpenseController extends AbstractController
     {
         $this->entityManager = $entityManager;
     }
-    // Récupérer toutes les dépenses
+  
     #[Route('/api/expenses', name: 'get_expenses', methods: ['GET'])]
     public function getExpenses(ExpenseRepository $repository): JsonResponse
     {
@@ -41,24 +41,24 @@ class ExpenseController extends AbstractController
         return $this->json($data);
     }
 
-    // Ajouter une dépense
+  
     #[Route('/api/expenses', name: 'add_expense', methods: ['POST'])]
 public function addExpense(Request $request, EntityManagerInterface $entityManager): JsonResponse
 {
     $data = json_decode($request->getContent(), true);
 
-    // Vérifier que les champs requis sont présents
+
     if (!isset($data['label'], $data['amount'], $data['date'], $data['category_id'])) {
         return new JsonResponse(['error' => 'Missing required fields'], JsonResponse::HTTP_BAD_REQUEST);
     }
 
-    // Récupérer la catégorie
+   
     $category = $entityManager->getRepository(Category::class)->find($data['category_id']);
     if (!$category) {
         return new JsonResponse(['error' => 'Category not found'], JsonResponse::HTTP_BAD_REQUEST);
     }
 
-    // Créer une nouvelle dépense
+    
     $expense = new Expense();
     $expense->setLabel($data['label']);
     $expense->setAmount((float) $data['amount']);
@@ -72,7 +72,7 @@ public function addExpense(Request $request, EntityManagerInterface $entityManag
 }
 
 
-    // Modifier une dépense
+  
     #[Route('/api/expenses/{id}', name: 'update_expense', methods: ['PUT'])]
     public function updateExpense(int $id, Request $request, EntityManagerInterface $em, ExpenseRepository $repository): JsonResponse
     {
@@ -92,7 +92,7 @@ public function addExpense(Request $request, EntityManagerInterface $entityManag
         return $this->json(['message' => 'Expense updated successfully']);
     }
 
-    // Supprimer une dépense
+  
     #[Route('/api/expenses/{id}', name: 'delete_expense', methods: ['DELETE'])]
     public function deleteExpense(int $id, EntityManagerInterface $em, ExpenseRepository $repository): JsonResponse
     {
