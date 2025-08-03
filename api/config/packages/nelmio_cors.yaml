@@ -1,6 +1,14 @@
 nelmio_cors:
     defaults:
-        allow_origin: ["http://localhost:3000", "http://localhost:3001"]
+        allow_origin:
+            [
+                "http://localhost:3000",
+                "http://localhost:3001",
+                "http://localhost",
+                "http://localhost:80",
+                "http://89.168.54.172",
+                "http://89.168.54.172:80",
+            ]
         allow_credentials: true
         allow_headers: ["Content-Type", "Authorization", "Accept"]
         allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
@@ -8,7 +16,15 @@ nelmio_cors:
         max_age: 3600
     paths:
         "^/api/":
-            allow_origin: ["http://localhost:3000", "http://localhost:3001"]
+            allow_origin:
+                [
+                    "http://localhost:3000",
+                    "http://localhost:3001",
+                    "http://localhost",
+                    "http://localhost:80",
+                    "http://89.168.54.172",
+                    "http://89.168.54.172:80",
+                ]
             allow_headers: ["Content-Type", "Authorization", "Accept"]
             allow_methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
             allow_credentials: true

@@ -17,11 +17,8 @@ const Login = () => {
     setError(null);
 
     try {
-      const res = await api.post(
-        "/login",
-        { email, password },
-        { responseType: "text" }
-      );
+      const res = await api.post("/login", { email, password });
+      localStorage.setItem("auth_token", res.data.token);
 
       // DEBUG 1 : affiche la réponse brute reçue du backend
       console.log("=== Réponse brute ===");
