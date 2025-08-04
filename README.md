@@ -11,6 +11,14 @@ Accédez à l’application en production :
 http://89.168.54.172
 
 ---
+## 🔐 Identifiants par défaut
+
+Pour te connecter à l’application, utilise l’utilisateur créé par les fixtures :
+
+- **Email :** `test@example.com`  
+- **Mot de passe :** `password`
+
+Ces identifiants sont valides en local et en production (fixtures chargées via `AppFixtures`).  
 
 ## 🛠️ Stack technique
 
