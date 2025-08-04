@@ -7,7 +7,7 @@ env:
   REGISTRY: docker.io
   BACK_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-back
   FRONT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front
-
+  VM_HOST: ${{ secrets.VM_HOST }}
 jobs:
   # ---------- Build & Push ----------
   build-and-push:
