@@ -1,52 +1,100 @@
-name: Build & Deploy to Oracle VM
-
+name: CI & Deploy to Oracle VM
 on:
   push:
     branches: [main]
 
+env:
+  REGISTRY: docker.io
+  BACK_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-back
+  FRONT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front
+
 jobs:
+  # ---------- Build & Push ----------
   build-and-push:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        shell: bash
     steps:
-      - uses: actions/checkout@v3
+      # 1. checkout
+      - uses: actions/checkout@v4
 
-      # Build & push back
-      - name: Build & push backend
-        uses: docker/build-push-action@v4
+      # 2. ---------- BACK-END ----------
+      - name: Install back deps & run tests
+        working-directory: api
+        run: |
+          composer install --no-dev --prefer-dist --no-progress
+          # phpunit optionnel :
+          # vendor/bin/phpunit --colors=always
+
+      # 3. ---------- FRONT-END ----------
+      - name: Install front deps & lint
+        working-directory: front
+        run: |
+          npm ci
+          npm run lint --if-present
+      - name: Build front production bundle
+        working-directory: front
+        run: npm run build
+
+      # 4. ---------- Docker login ----------
+      - uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 5. ---------- Build & push back ----------
+      - name: Build & push backend image
+        uses: docker/build-push-action@v5
         with:
           context: ./api
           file: ./api/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-back:latest
+          tags: |
+            ${{ env.BACK_IMAGE }}:${{ github.sha }}
+            ${{ env.BACK_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.BACK_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.BACK_IMAGE }}:cache,mode=max
 
-      # Build & push front
-      - name: Build & push frontend
-        uses: docker/build-push-action@v4
+      # 6. ---------- Build & push front ----------
+      - name: Build & push frontend image
+        uses: docker/build-push-action@v5
         with:
           context: ./front
           file: ./front/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
+          tags: |
+            ${{ env.FRONT_IMAGE }}:${{ github.sha }}
+            ${{ env.FRONT_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.FRONT_IMAGE }}:cache
+          cache-to: type=registry,ref=${{ env.FRONT_IMAGE }}:cache,mode=max
 
+  # ---------- Deploy ----------
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
-
+    environment:
+      name: production
+      url: http://${{ secrets.VM_HOST }}
     steps:
+      # 1. ssh-agent
       - uses: webfactory/ssh-agent@v0.8.1
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
+      # 2. add host
       - name: Add VM to known_hosts
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Pull & restart on VM
+      # 3. pull & up
+      - name: Pull images & restart services
         run: |
-          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
-            cd ~/mybank-deploy
-            docker-compose pull        # Récupère les nouvelles images
-            docker-compose up -d       # Relance les services
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} <<'EOF'
+            set -e
+            cd ~/mybank
+            docker-compose pull          # récupère back & front latest
+            docker-compose up -d         # redémarre en arrière-plan
+            docker image prune -f        # nettoie les dangling
           EOF

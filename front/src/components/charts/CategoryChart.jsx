@@ -1,60 +1,62 @@
 import React from "react";
-import {
-  PieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import { Doughnut } from "react-chartjs-2";
 import PropTypes from "prop-types";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
+
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const COLORS = ["#59E5A9", "#14213D", "#FCA311", "#EC0B43", "#000000"];
 
 const CategoryChart = ({ expenses }) => {
-  const data = Object.values(
-    expenses.reduce((acc, exp) => {
-      const name = exp.category.name;
-      const amount = parseFloat(exp.amount);
-      if (!acc[name]) acc[name] = { name, value: 0 };
-      acc[name].value += amount;
-      return acc;
-    }, {})
-  );
+  const totals = expenses.reduce((acc, { category, amount }) => {
+    const name = category.name;
+    acc[name] = (acc[name] || 0) + parseFloat(amount);
+    return acc;
+  }, {});
+
+  const labels = Object.keys(totals);
+  const data = Object.values(totals);
+
+  const chartData = {
+    labels,
+    datasets: [
+      {
+        data,
+        backgroundColor: labels.map((_, idx) => COLORS[idx % COLORS.length]),
+        borderColor: "#ffffff",
+        borderWidth: 2,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: "bottom" },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${ctx.label}: ${ctx.parsed} €`,
+        },
+      },
+    },
+  };
 
   return (
-    <div className="mt-8 bg-white rounded-xl shadow p-6">
+    <div className="mt-8 bg-white rounded-xl shadow p-6 flex flex-col items-center">
       <h2 className="text-xl font-semibold text-[#14213D] mb-4">
         Expenses by Category
       </h2>
-      <ResponsiveContainer width="100%" height={300}>
-        <PieChart>
-          <Pie
-            data={data}
-            dataKey="value"
-            nameKey="name"
-            cx="50%"
-            cy="50%"
-            outerRadius={100}
-            innerRadius={60}
-            paddingAngle={4}
-            label={({ name, percent }) =>
-              `${name} ${(percent * 100).toFixed(0)}%`
-            }
-          >
-            {data.map((_, idx) => (
-              <Cell
-                key={idx}
-                fill={COLORS[idx % COLORS.length]}
-                stroke="#fff"
-                strokeWidth={2}
-              />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value) => `${value.toFixed(2)} €`} />
-          <Legend verticalAlign="bottom" height={36} />
-        </PieChart>
-      </ResponsiveContainer>
+
+      <div className="w-72 h-72 relative">
+        <Doughnut
+          data={chartData}
+          options={options}
+          width={280}
+          height={280}
+          redraw={true}
+        />
+      </div>
     </div>
   );
 };
