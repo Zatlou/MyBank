@@ -1,13 +1,14 @@
-
-FROM node:18-alpine AS build
+# STAGE 1 – build
+FROM node:18 AS builder
 WORKDIR /app
-COPY package*.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
+# on exclude src/.cache via .dockerignore
 COPY . .
 RUN npm run build
 
-
-FROM nginx:alpine
-COPY --from=build /app/build /usr/share/nginx/html
+# STAGE 2 – nginx statique
+FROM nginx:stable-alpine
+COPY --from=builder /app/build /usr/share/nginx/html
+# ton config nginx si besoin
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]

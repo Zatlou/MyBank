@@ -1,77 +1,52 @@
-# .github/workflows/ci-cd.yml
-name: CI & CD
+name: Build & Deploy to Oracle VM
 
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
-  build-and-publish:
-    name: 🚧 Build, Test & Publish API
+  build-and-push:
     runs-on: ubuntu-latest
 
-    # 1) On lève un service Postgres pour le job
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: mybank
-          POSTGRES_USER: user
-          POSTGRES_PASSWORD: pass
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U user -d mybank"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    steps:
+      - uses: actions/checkout@v3
 
-    # 2) On définit la variable DATABASE_URL pour l'environnement de test
-    env:
-      DATABASE_URL: "pgsql://user:pass@localhost:5432/mybank?serverVersion=16&charset=utf8"
-      APP_ENV: test
+      # Build & push back
+      - name: Build & push backend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./api
+          file: ./api/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-back:latest
+
+      # Build & push front
+      - name: Build & push frontend
+        uses: docker/build-push-action@v4
+        with:
+          context: ./front
+          file: ./front/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front:latest
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup PHP 8.2 + extensions
-        uses: shivammathur/setup-php@v2
+      - uses: webfactory/ssh-agent@v0.8.1
         with:
-          php-version: 8.2
-          extensions: mbstring, intl, pdo_pgsql, xml, ctype, json
-          coverage: none
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Cache Composer dependencies
-        uses: actions/cache@v3
-        with:
-          path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('api/composer.lock') }}
-          restore-keys: ${{ runner.os }}-composer-
-
-      - name: Validate composer.json
-        working-directory: api
-        run: composer validate --no-check-publish
-
-      - name: Install API dependencies
-        working-directory: api
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Wait for PostgreSQL
+      - name: Add VM to known_hosts
         run: |
-          until pg_isready -h localhost -U user; do
-            echo "Waiting for Postgres…"
-            sleep 1
-          done
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Create database & run migrations
-        working-directory: api
+      - name: Pull & restart on VM
         run: |
-          php bin/console doctrine:database:create --if-not-exists --env=test
-          php bin/console doctrine:migrations:migrate --no-interaction --env=test
-
-      - name: Run PHPUnit
-        working-directory: api
-        run: vendor/bin/phpunit --testdox
+          ssh ${{ secrets.VM_USER }}@${{ secrets.VM_HOST }} << 'EOF'
+            cd ~/mybank-deploy
+            docker-compose pull        # Récupère les nouvelles images
+            docker-compose up -d       # Relance les services
+          EOF

@@ -1,0 +1,10 @@
+# front/.dockerignore
+.git
+src
+node_modules
+Dockerfile*
+*.log
+.eslintrc.js
+vendor/
+front/node_modules/
+api/vendor/

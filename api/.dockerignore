@@ -1,0 +1,9 @@
+# api/.dockerignore
+.git
+tests
+Dockerfile*
+.env*
+README.md
+vendor/
+front/node_modules/
+api/vendor/
