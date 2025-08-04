@@ -23,8 +23,7 @@ jobs:
       - name: Install back deps & run tests
         working-directory: api
         run: |
-          composer install --no-dev --prefer-dist --no-progress
-          # phpunit optionnel :
+          composer install --prefer-dist --no-progress   # ⬅︎ garde les dev deps
           # vendor/bin/phpunit --colors=always
 
       # 3. ---------- FRONT-END ----------
