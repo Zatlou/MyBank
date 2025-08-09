@@ -1,7 +1,11 @@
 pipeline {
-    agent { label 'linux' } // Ton agent
+    agent { label 'linux' }
 
-    options { timestamps(); ansiColor('xterm') }
+    environment {
+        // Optionnel : si ton API utilise une URL locale pendant les tests
+        REACT_APP_API_URL = "http://localhost:8000"
+        NODE_ENV = "test"
+    }
 
     stages {
         stage('Checkout') {
@@ -10,39 +14,28 @@ pipeline {
             }
         }
 
-        stage('API - Install & Test') {
+        stage('Install & Test Frontend') {
             steps {
-                dir('api') {
-                    sh 'php -v && composer -V'
-                    sh 'composer install --no-interaction --no-progress --prefer-dist'
-
-                    // Création du fichier .env.test si besoin
-                    sh 'mkdir -p var && (grep -q "DATABASE_URL" .env.test || echo "DATABASE_URL=sqlite:///%kernel.project_dir%/var/data.db" >> .env.test)'
-                    // Exécuter PHPUnit
-                    sh './bin/phpunit --log-junit ../api-junit.xml || vendor/bin/phpunit --log-junit ../api-junit.xml'
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'api-junit.xml'
+                dir('front') {
+                    sh '''
+                        echo "=== Installation Front ==="
+                        npm install
+                        echo "=== Lancement des tests Front ==="
+                        npm test -- --watchAll=false
+                    '''
                 }
             }
         }
 
-        stage('Front - Install & Test') {
-            environment {
-                JEST_JUNIT_OUTPUT = 'junit.xml'
-            }
+        stage('Install & Test API') {
             steps {
-                dir('front') {
-                    sh 'node -v && npm -v'
-                    sh 'npm ci || npm install'
-                    sh 'npm test -- --watchAll=false --reporters=default --reporters=jest-junit'
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'front/junit.xml'
+                dir('api') {
+                    sh '''
+                        echo "=== Installation dépendances API ==="
+                        composer install --no-interaction --prefer-dist
+                        echo "=== Lancement des tests API ==="
+                        ./vendor/bin/phpunit --configuration phpunit.xml.dist
+                    '''
                 }
             }
         }
@@ -50,9 +43,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Pipeline réussi'
+            echo "✅ Build et tests réussis !"
         }
         failure {
-            echo '❌ Pipeline échoué'
+            echo "❌ Échec du pipeline."
         }
-        alway
+    }
+}
