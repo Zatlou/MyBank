@@ -1,0 +1,4 @@
+<?xml version="1.0"?><ruleset name="MyBank"><rule ref="PSR12"/></ruleset>
+<coverage processUncoveredFiles="true">
+  <report><clover outputFile="coverage.xml"/></report>
+</coverage>
