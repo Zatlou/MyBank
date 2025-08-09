@@ -3,40 +3,29 @@ pipeline {
 
     stages {
         stage('Checkout') {
-            agent { label 'linux' } // Ton agent Jenkins
+            agent { label 'linux' }
             steps {
                 checkout scm
             }
         }
 
         stage('Install & Test Frontend') {
-            agent {
-                docker {
-                    image 'node:18'
-                    args '-v $PWD:/workspace -w /workspace/front'
-                }
-            }
+            agent { label 'linux' }
             steps {
-                sh 'echo "=== Installation Front ==="'
-                sh 'npm install'
-                sh 'npm test -- --watchAll=false || true' // ignore test fail si besoin
-                sh 'npm run build'
+                sh '''
+                    docker run --rm -v $PWD:/workspace -w /workspace/front node:18 \
+                    sh -c "npm install && npm test -- --watchAll=false || true && npm run build"
+                '''
             }
         }
 
         stage('Install & Test API') {
-            agent {
-                docker {
-                    image 'php:8.2-cli'
-                    args '-v $PWD:/workspace -w /workspace/api'
-                }
-            }
+            agent { label 'linux' }
             steps {
-                sh 'echo "=== Installation API ==="'
-                sh 'php -v'
-                sh 'curl -sS https://getcomposer.org/installer | php'
-                sh 'php composer.phar install'
-                sh './vendor/bin/phpunit --configuration phpunit.xml.dist'
+                sh '''
+                    docker run --rm -v $PWD:/workspace -w /workspace/api php:8.2-cli \
+                    sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install && ./vendor/bin/phpunit --configuration phpunit.xml.dist"
+                '''
             }
         }
     }
