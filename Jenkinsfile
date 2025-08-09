@@ -13,6 +13,7 @@ pipeline {
             agent { label 'linux' }
             steps {
                 sh '''
+                    echo "=== Installation & Tests Front ==="
                     docker run --rm -v $PWD:/workspace -w /workspace/front node:18 \
                     sh -c "npm install && npm test -- --watchAll=false || true && npm run build"
                 '''
@@ -23,6 +24,7 @@ pipeline {
             agent { label 'linux' }
             steps {
                 sh '''
+                    echo "=== Installation & Tests API ==="
                     docker run --rm -v $PWD:/workspace -w /workspace/api php:8.2-cli \
                     sh -c "curl -sS https://getcomposer.org/installer | php && php composer.phar install && ./vendor/bin/phpunit --configuration phpunit.xml.dist"
                 '''
