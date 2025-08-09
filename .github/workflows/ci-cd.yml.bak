@@ -1,0 +1,95 @@
+# name: CI & Deploy to Oracle VM
+
+# on:
+#   push:
+#     branches: [main]
+
+# env:
+#   REGISTRY: docker.io
+#   BACK_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-back
+#   FRONT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/mybank-front
+#   VM_HOST: ${{ secrets.VM_HOST }}
+#   VM_USER: ${{ secrets.VM_USER }}
+
+# jobs:
+#   build-and-push:
+#     runs-on: ubuntu-latest
+#     defaults:
+#       run:
+#         shell: bash
+
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
+
+#       - name: Install back deps & run tests
+#         working-directory: api
+#         run: |
+#           composer install --no-dev --optimize-autoloader
+#           # vendor/bin/phpunit --colors=always
+
+#       - name: Install front deps & lint
+#         working-directory: front
+#         run: |
+#           npm install --no-audit --no-fund
+#           npm run lint --if-present || true
+
+#       - name: Build front production bundle
+#         working-directory: front
+#         run: npm run build
+
+#       - name: Docker login
+#         uses: docker/login-action@v2
+#         with:
+#           username: ${{ secrets.DOCKERHUB_USERNAME }}
+#           password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+#       - name: Build & push backend image
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./api
+#           file: ./api/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ env.BACK_IMAGE }}:${{ github.sha }}
+#             ${{ env.BACK_IMAGE }}:latest
+#           cache-from: type=registry,ref=${{ env.BACK_IMAGE }}:cache
+#           cache-to: type=registry,ref=${{ env.BACK_IMAGE }}:cache,mode=max
+
+#       - name: Build & push frontend image
+#         uses: docker/build-push-action@v5
+#         with:
+#           context: ./front
+#           file: ./front/Dockerfile
+#           push: true
+#           tags: |
+#             ${{ env.FRONT_IMAGE }}:${{ github.sha }}
+#             ${{ env.FRONT_IMAGE }}:latest
+#           cache-from: type=registry,ref=${{ env.FRONT_IMAGE }}:cache
+#           cache-to: type=registry,ref=${{ env.FRONT_IMAGE }}:cache,mode=max
+
+#   deploy:
+#     needs: build-and-push
+#     runs-on: ubuntu-latest
+#     environment: production
+
+#     steps:
+#       - name: Set up SSH agent
+#         uses: webfactory/ssh-agent@v0.8.1
+#         with:
+#           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+#       - name: Add VM to known hosts
+#         run: |
+#           mkdir -p ~/.ssh
+#           ssh-keyscan -H "${{ env.VM_HOST }}" >> ~/.ssh/known_hosts
+
+#       - name: Pull images & restart services
+#         run: |
+#           ssh "${{ env.VM_USER }}"@"${{ env.VM_HOST }}" << 'EOF'
+#             set -e
+#             cd ~/mybank
+#             docker-compose pull
+#             docker-compose up -d
+#             docker image prune -f
+#           EOF

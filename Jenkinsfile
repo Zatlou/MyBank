@@ -15,6 +15,7 @@ pipeline {
                 dir('api') {
                     sh 'php -v && composer -V'
                     sh 'composer install --no-interaction --no-progress --prefer-dist'
+
                     // Création du fichier .env.test si besoin
                     sh 'mkdir -p var && (grep -q "DATABASE_URL" .env.test || echo "DATABASE_URL=sqlite:///%kernel.project_dir%/var/data.db" >> .env.test)'
                     // Exécuter PHPUnit
